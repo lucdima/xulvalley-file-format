@@ -1,0 +1,26 @@
+{
+  "items" : [
+    {
+      "content" : {
+        "text" : {
+          "_0" : {
+            "fontSize" : 36,
+            "string" : "Hello, board."
+          }
+        }
+      },
+      "frame" : [
+        [
+          -160,
+          -40
+        ],
+        [
+          320,
+          64
+        ]
+      ],
+      "id" : "1C828B41-7159-53D0-AFF5-71C6A85B08BD",
+      "rotation" : 0
+    }
+  ]
+}

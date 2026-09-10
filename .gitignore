@@ -1,0 +1,5 @@
+.DS_Store
+
+# A board's merge state is machine-only, and each replica file holds a whole
+# model. Nothing readable lives here that board.json doesn't already say.
+*.xulvalley/collab/

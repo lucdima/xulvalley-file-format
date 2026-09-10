@@ -1,0 +1,515 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/lucdima/xulvalley-file-format/main/board.schema.json",
+  "title": "Xul Valley board.json",
+  "description": "The model file inside a .xulvalley document package. Format version 1. Prose reference: file-format.md",
+  "type": "object",
+  "required": ["items"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Format version, stamped by the writer at save time. Absent means 1. A build refuses to open a file whose version is higher than its own."
+    },
+    "items": { "type": "array", "items": { "$ref": "#/$defs/BoardItem" } },
+    "connectors": { "type": "array", "items": { "$ref": "#/$defs/Connector" } },
+    "background": { "$ref": "#/$defs/RGBAColor" },
+    "pattern": { "enum": ["none", "dots", "grid", "lines"], "default": "dots" },
+    "patternColor": { "$ref": "#/$defs/RGBAColor" },
+    "viewport": { "$ref": "#/$defs/Viewport" },
+    "transition": { "enum": ["ease", "fly", "direct"], "default": "ease" },
+    "slidePause": {
+      "type": "integer",
+      "description": "Seconds Present-mode auto-play dwells on a slide. Absent means 3; values below 1 are clamped to 1 on read."
+    },
+    "autoplayLoop": { "type": "boolean" },
+    "styleDefaults": { "$ref": "#/$defs/BoardStyleDefaults" },
+    "groups": { "type": "array", "items": { "$ref": "#/$defs/BoardGroup" } }
+  },
+
+  "$defs": {
+    "RGBAColor": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{8}$",
+      "description": "#RRGGBBAA. Alpha is always present. The writer emits uppercase; the reader accepts either case.",
+      "examples": ["#FBF8F2FF", "#00000019"]
+    },
+    "UUID": {
+      "type": "string",
+      "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+      "description": "Hyphenated UUID. The writer emits uppercase."
+    },
+    "OrderKey": {
+      "type": "string",
+      "pattern": "^[0-9A-Za-z]+$",
+      "description": "Base-62 fractional order key. Sorts lexicographically; new keys are minted into the gaps between existing ones.",
+      "examples": ["1V", "2z8"]
+    },
+    "CGPoint": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "[x, y] in world coordinates."
+    },
+    "CGSize": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "[width, height]."
+    },
+    "CGRect": {
+      "type": "array",
+      "prefixItems": [{ "$ref": "#/$defs/CGPoint" }, { "$ref": "#/$defs/CGSize" }],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "[[x, y], [width, height]] in world coordinates. Always axis-aligned; rotation is a separate field."
+    },
+    "Viewport": {
+      "type": "object",
+      "description": "Saved camera. Decoded strictly: both keys are required when the object is present.",
+      "required": ["center", "scale"],
+      "properties": {
+        "center": { "$ref": "#/$defs/CGPoint" },
+        "scale": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "BoardGroup": {
+      "type": "object",
+      "description": "Membership lives on the items (BoardItem.groupID); this record only remembers the group box's angle. Decoded strictly: both keys required.",
+      "required": ["id", "rotation"],
+      "properties": {
+        "id": { "$ref": "#/$defs/UUID" },
+        "rotation": { "type": "number", "description": "Degrees, 0..<360." }
+      }
+    },
+
+    "BoardItem": {
+      "type": "object",
+      "required": ["id", "frame", "rotation", "content"],
+      "properties": {
+        "id": { "$ref": "#/$defs/UUID" },
+        "frame": { "$ref": "#/$defs/CGRect" },
+        "rotation": { "type": "number", "description": "Degrees clockwise about the frame's center." },
+        "content": { "$ref": "#/$defs/ItemContent" },
+        "groupID": { "$ref": "#/$defs/UUID" },
+        "locked": { "type": "boolean", "default": false },
+        "caption": { "$ref": "#/$defs/ItemCaption" },
+        "z": { "$ref": "#/$defs/OrderKey" }
+      }
+    },
+
+    "ItemContent": {
+      "type": "object",
+      "description": "Exactly one key, named for the kind, whose payload sits under \"_0\".",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "text":  { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/TextContent" } } },
+        "shape": { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/ShapeContent" } } },
+        "note":  { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/NoteContent" } } },
+        "image": { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/ImageContent" } } },
+        "video": { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/VideoContent" } } },
+        "audio": { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/AudioContent" } } },
+        "pdf":   { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/PDFContent" } } },
+        "slide": { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/SlideContent" } } },
+        "link":  { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/LinkContent" } } },
+        "table": { "$ref": "#/$defs/Payload", "properties": { "_0": { "$ref": "#/$defs/TableContent" } } }
+      },
+      "additionalProperties": false
+    },
+    "Payload": {
+      "type": "object",
+      "required": ["_0"],
+      "description": "Swift's enum-with-payload encoding: the unlabeled associated value is keyed \"_0\"."
+    },
+
+    "TextContent": {
+      "type": "object",
+      "description": "Also used, unchanged, as a shape's label, a connector's label, a caption's text and a table's cell style. Every key is optional on read.",
+      "properties": {
+        "string": { "type": "string", "default": "" },
+        "fontSize": { "type": "number", "default": 24 },
+        "fontFamily": { "type": "string", "description": "Absent = system font." },
+        "fontFace": { "type": "string", "description": "PostScript name of the member face." },
+        "bold": { "type": "boolean", "default": false },
+        "italic": { "type": "boolean", "default": false },
+        "underline": { "type": "boolean", "default": false },
+        "strikethrough": { "type": "boolean", "default": false },
+        "alignment": { "enum": ["leading", "center", "trailing"], "default": "leading" },
+        "color": { "$ref": "#/$defs/RGBAColor" },
+        "colorSpans": { "type": "array", "items": { "$ref": "#/$defs/TextColorSpan" } },
+        "highlight": { "$ref": "#/$defs/RGBAColor" },
+        "highlightSpans": { "type": "array", "items": { "$ref": "#/$defs/TextColorSpan" } },
+        "emphasisSpans": { "type": "array", "items": { "$ref": "#/$defs/TextEmphasisSpan" } },
+        "outline": { "$ref": "#/$defs/TextOutline" },
+        "width": { "type": "number", "description": "Absent = content-sized (the box hugs its text)." },
+        "height": { "type": "number", "description": "Absent = content-sized. Text is top-anchored and clips." }
+      }
+    },
+    "TextColorSpan": {
+      "type": "object",
+      "description": "Character offsets into TextContent.string, not UTF-8 byte offsets. Decoded strictly: all three keys required.",
+      "required": ["start", "length", "color"],
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "length": { "type": "integer", "minimum": 0 },
+        "color": { "$ref": "#/$defs/RGBAColor" }
+      }
+    },
+    "TextEmphasisSpan": {
+      "type": "object",
+      "description": "An absent trait means inherit, which is not the same as false. Decoded strictly: start and length required.",
+      "required": ["start", "length"],
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "length": { "type": "integer", "minimum": 0 },
+        "bold": { "type": "boolean" },
+        "italic": { "type": "boolean" },
+        "underline": { "type": "boolean" },
+        "strikethrough": { "type": "boolean" }
+      }
+    },
+    "TextOutline": {
+      "type": "object",
+      "description": "Decoded strictly: all three keys required when the object is present.",
+      "required": ["enabled", "color", "width"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "color": { "$ref": "#/$defs/RGBAColor" },
+        "width": { "type": "number" }
+      }
+    },
+
+    "ShapeContent": {
+      "type": "object",
+      "description": "Every key is optional on read. hasFill / hasBorder / showsLabel are switches, not erasers: the color, width and label text are retained while off.",
+      "properties": {
+        "kind": {
+          "enum": ["rectangle", "ellipse", "triangle", "roundedRectangle", "diamond", "vector"],
+          "default": "rectangle"
+        },
+        "vector": { "$ref": "#/$defs/VectorGlyph" },
+        "hasFill": { "type": "boolean", "default": true },
+        "fillColor": { "$ref": "#/$defs/RGBAColor" },
+        "hasBorder": { "type": "boolean", "default": true },
+        "stroke": { "$ref": "#/$defs/RGBAColor" },
+        "strokeWidth": { "type": "number", "default": 2 },
+        "cornerRadius": { "type": "number", "default": 16, "description": "Only meaningful for roundedRectangle." },
+        "showsLabel": { "type": "boolean", "default": true },
+        "label": { "$ref": "#/$defs/TextContent" },
+        "labelVerticalAlignment": { "enum": ["top", "center", "bottom"], "default": "center" },
+        "flipH": { "type": "boolean", "default": false },
+        "flipV": { "type": "boolean", "default": false }
+      },
+      "if": { "properties": { "kind": { "const": "vector" } }, "required": ["kind"] },
+      "then": {
+        "required": ["vector"],
+        "$comment": "A vector shape with no glyph payload decodes, but has nothing to draw."
+      }
+    },
+    "VectorGlyph": {
+      "type": "object",
+      "description": "Path data in the glyph's own coordinate box, inlined rather than stored in media/. Catalog ids are never reused or renamed.",
+      "required": ["id", "name", "size", "paths"],
+      "properties": {
+        "id": { "type": "string", "examples": ["lucide.tree"] },
+        "name": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "category": { "type": "string", "default": "" },
+        "size": { "$ref": "#/$defs/CGSize", "description": "The glyph's own box, normalized to a 1000-unit side." },
+        "paths": { "type": "array", "items": { "$ref": "#/$defs/VectorPathData" } }
+      }
+    },
+    "VectorPathData": {
+      "type": "object",
+      "required": ["d"],
+      "properties": {
+        "d": { "type": "string", "description": "SVG path data, in the glyph's size box." },
+        "rule": { "enum": ["nonZero", "evenOdd"], "default": "nonZero" }
+      }
+    },
+
+    "NoteContent": {
+      "type": "object",
+      "description": "Decoded strictly: unlike most of the model, every key is required.",
+      "required": ["string", "noteColor", "textColor", "bold", "italic", "alignment"],
+      "properties": {
+        "string": { "type": "string" },
+        "noteColor": { "$ref": "#/$defs/RGBAColor" },
+        "textColor": { "$ref": "#/$defs/RGBAColor" },
+        "bold": { "type": "boolean" },
+        "italic": { "type": "boolean" },
+        "alignment": { "enum": ["leading", "center", "trailing"] }
+      }
+    },
+
+    "ImageContent": {
+      "type": "object",
+      "required": ["media", "naturalSize"],
+      "properties": {
+        "media": { "$ref": "#/$defs/MediaName" },
+        "naturalSize": { "$ref": "#/$defs/CGSize" },
+        "border": { "$ref": "#/$defs/ImageBorder" },
+        "cornerRadius": { "type": "number", "default": 0 },
+        "flipH": { "type": "boolean", "default": false },
+        "flipV": { "type": "boolean", "default": false },
+        "crop": { "$ref": "#/$defs/CropRect" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+        "grayscale": { "type": "boolean", "default": false },
+        "originalMedia": { "$ref": "#/$defs/MediaName", "description": "The pre-edit blob, when one is kept." }
+      }
+    },
+    "VideoContent": {
+      "type": "object",
+      "required": ["media", "naturalSize"],
+      "properties": {
+        "media": { "$ref": "#/$defs/MediaName" },
+        "naturalSize": { "$ref": "#/$defs/CGSize" },
+        "border": { "$ref": "#/$defs/ImageBorder" },
+        "cornerRadius": { "type": "number", "default": 0 },
+        "loop": { "type": "boolean", "default": false }
+      }
+    },
+    "AudioContent": {
+      "type": "object",
+      "required": ["media"],
+      "properties": {
+        "media": { "$ref": "#/$defs/MediaName" },
+        "border": { "$ref": "#/$defs/ImageBorder" },
+        "cornerRadius": { "type": "number", "default": 0 },
+        "loop": { "type": "boolean", "default": false }
+      }
+    },
+    "PDFContent": {
+      "type": "object",
+      "required": ["media", "naturalSize", "pageCount"],
+      "properties": {
+        "media": { "$ref": "#/$defs/MediaName" },
+        "naturalSize": { "$ref": "#/$defs/CGSize" },
+        "pageIndex": { "type": "integer", "minimum": 0, "default": 0 },
+        "pageCount": { "type": "integer", "minimum": 1 },
+        "border": { "$ref": "#/$defs/ImageBorder" },
+        "cornerRadius": { "type": "number", "default": 0 },
+        "showsPageControls": { "type": "boolean", "default": true }
+      }
+    },
+    "MediaName": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}\\.[A-Za-z0-9]+$",
+      "description": "A bare filename in the package's media/ folder: the SHA-256 of the bytes, lowercase hex, plus a lowercased extension.",
+      "examples": ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.png"]
+    },
+    "ImageBorder": {
+      "type": "object",
+      "description": "Decoded strictly: all three keys required when the object is present.",
+      "required": ["enabled", "color", "width"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "color": { "$ref": "#/$defs/RGBAColor" },
+        "width": { "type": "number" }
+      }
+    },
+    "CropRect": {
+      "type": "object",
+      "description": "Unit coordinates (0...1) of the source image. Decoded strictly, then clamped: minimum side 0.02.",
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "width": { "type": "number", "minimum": 0.02, "maximum": 1 },
+        "height": { "type": "number", "minimum": 0.02, "maximum": 1 }
+      }
+    },
+
+    "SlideContent": {
+      "type": "object",
+      "description": "A frame the presentation walks. It holds no children; it just bounds a region.",
+      "properties": {
+        "name": { "type": "string", "default": "" },
+        "aspect": {
+          "enum": ["square", "landscape", "portrait", "fourThree", "threeFour", "free"],
+          "default": "landscape"
+        }
+      }
+    },
+    "LinkContent": {
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "url": { "type": "string" },
+        "title": { "type": "string", "description": "Open Graph metadata fetched from the URL." },
+        "summary": { "type": "string", "description": "Open Graph metadata fetched from the URL." },
+        "imageMedia": { "$ref": "#/$defs/MediaName", "description": "The fetched preview image, stored in media/." },
+        "imageNaturalSize": { "$ref": "#/$defs/CGSize" },
+        "showsPreview": { "type": "boolean", "default": true },
+        "transparentBackground": { "type": "boolean", "default": true }
+      }
+    },
+
+    "TableContent": {
+      "type": "object",
+      "description": "Every key is optional on read. The item's own frame is derived from columns and rows, not set.",
+      "properties": {
+        "columns": { "type": "array", "items": { "type": "number" }, "description": "Column widths; length = column count." },
+        "rows": { "type": "array", "items": { "type": "number" }, "description": "Row heights; length = row count." },
+        "cells": {
+          "type": "array",
+          "items": { "type": "array", "items": { "$ref": "#/$defs/TableCellContent" } },
+          "description": "Row-major: cells[row][column]."
+        },
+        "text": { "$ref": "#/$defs/TextContent", "description": "The table-wide text style." },
+        "fillColor": { "$ref": "#/$defs/RGBAColor" },
+        "gridColor": { "$ref": "#/$defs/RGBAColor" },
+        "gridWidth": { "type": "number" }
+      }
+    },
+    "TableCellContent": {
+      "type": "object",
+      "properties": {
+        "string": { "type": "string", "default": "" },
+        "text": { "$ref": "#/$defs/TextContent", "description": "Present only on a cell overriding the table style." },
+        "fill": { "$ref": "#/$defs/RGBAColor" }
+      }
+    },
+
+    "ItemCaption": {
+      "type": "object",
+      "description": "A label drawn inside the frame over one end of a media item, on a translucent scrim.",
+      "required": ["text"],
+      "properties": {
+        "text": { "$ref": "#/$defs/TextContent" },
+        "position": { "enum": ["top", "bottom"], "default": "bottom" },
+        "shown": { "type": "boolean", "default": true },
+        "background": { "$ref": "#/$defs/RGBAColor" },
+        "backgroundOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "description": "0 lays the text straight on the media, with no band at all."
+        }
+      }
+    },
+
+    "Connector": {
+      "type": "object",
+      "description": "Connectors are not items: they have no frame, they reference items, and they live outside the items array. Decoded strictly, so every non-optional key must be spelled out.",
+      "required": [
+        "id", "from", "to", "points", "color", "width", "routing", "dash",
+        "startArrow", "endArrow", "labelPosition", "labelBackground"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/UUID" },
+        "from": { "$ref": "#/$defs/ConnectorEndpoint" },
+        "to": { "$ref": "#/$defs/ConnectorEndpoint" },
+        "points": { "type": "array", "items": { "$ref": "#/$defs/CGPoint" }, "description": "User-dragged waypoints." },
+        "color": { "$ref": "#/$defs/RGBAColor" },
+        "width": { "type": "number" },
+        "routing": { "enum": ["straight", "step", "curved"] },
+        "dash": { "enum": ["solid", "dashed", "dotted"] },
+        "startArrow": { "type": "boolean" },
+        "endArrow": { "type": "boolean" },
+        "label": { "$ref": "#/$defs/TextContent" },
+        "labelPosition": { "enum": ["horizontal", "over", "center", "under"] },
+        "labelBackground": { "type": "boolean" },
+        "above": {
+          "$ref": "#/$defs/UUID",
+          "description": "The id of the item this connector draws immediately in front of. Absent = behind everything."
+        }
+      }
+    },
+    "ConnectorEndpoint": {
+      "type": "object",
+      "description": "Either attached to an item's edge or free in space.",
+      "oneOf": [
+        {
+          "required": ["attached"],
+          "properties": {
+            "attached": {
+              "type": "object",
+              "required": ["item", "side"],
+              "properties": {
+                "item": { "$ref": "#/$defs/UUID" },
+                "side": { "enum": ["top", "right", "bottom", "left"] }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": ["free"],
+          "properties": {
+            "free": {
+              "type": "object",
+              "required": ["_0"],
+              "properties": { "_0": { "$ref": "#/$defs/CGPoint" } }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "BoardStyleDefaults": {
+      "type": "object",
+      "description": "Per-document defaults: what a new element on this board looks like. Tracks the last style used. Every key is optional on read; absent = the factory value.",
+      "properties": {
+        "shapeHasFill": { "type": "boolean", "default": true },
+        "shapeFill": { "$ref": "#/$defs/RGBAColor" },
+        "shapeHasBorder": { "type": "boolean", "default": true },
+        "shapeStroke": { "$ref": "#/$defs/RGBAColor" },
+        "shapeStrokeWidth": { "type": "number", "default": 2 },
+        "shapeRandomStyle": { "type": "boolean", "default": false, "description": "Each new shape is born with a fresh random fill/border/width." },
+        "shapeLabelColor": { "$ref": "#/$defs/RGBAColor" },
+        "shapeLabelFont": { "type": "string", "default": "", "description": "Empty = system font." },
+        "shapeLabelFace": { "type": "string", "default": "" },
+        "shapeLabelOutlineEnabled": { "type": "boolean", "default": false },
+        "shapeLabelOutlineColor": { "$ref": "#/$defs/RGBAColor" },
+        "shapeLabelOutlineWidth": { "type": "number", "default": 3 },
+        "noteColor": { "$ref": "#/$defs/RGBAColor" },
+        "noteTextColor": { "$ref": "#/$defs/RGBAColor" },
+        "textFont": { "type": "string", "default": "" },
+        "textFace": { "type": "string", "default": "" },
+        "textSize": { "type": "number", "default": 24 },
+        "textColor": { "$ref": "#/$defs/RGBAColor" },
+        "textOutlineEnabled": { "type": "boolean", "default": false },
+        "textOutlineColor": { "$ref": "#/$defs/RGBAColor" },
+        "textOutlineWidth": { "type": "number", "default": 2 },
+        "connectorColor": { "$ref": "#/$defs/RGBAColor" },
+        "connectorWidth": { "type": "number", "default": 2 },
+        "connectorRouting": { "enum": ["straight", "step", "curved"], "default": "curved" },
+        "connectorDash": { "enum": ["solid", "dashed", "dotted"], "default": "solid" },
+        "connectorStartArrow": { "type": "boolean", "default": false },
+        "connectorEndArrow": { "type": "boolean", "default": true },
+        "captionColor": { "$ref": "#/$defs/RGBAColor" },
+        "captionFont": { "type": "string", "default": "" },
+        "captionFace": { "type": "string", "default": "" },
+        "captionSize": { "type": "number", "default": 16 },
+        "captionBackground": { "$ref": "#/$defs/RGBAColor" },
+        "captionBackgroundOpacity": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 },
+        "slideAspect": {
+          "enum": ["square", "landscape", "portrait", "fourThree", "threeFour", "free"],
+          "default": "landscape"
+        },
+        "tableFill": { "$ref": "#/$defs/RGBAColor" },
+        "tableTextColor": { "$ref": "#/$defs/RGBAColor" },
+        "tableFont": { "type": "string", "default": "" },
+        "tableFace": { "type": "string", "default": "" },
+        "tableTextSize": { "type": "number", "default": 16 },
+        "tableGridColor": { "$ref": "#/$defs/RGBAColor" },
+        "tableGridWidth": { "type": "number", "default": 1 },
+        "tableRandomStyle": { "type": "boolean", "default": false },
+        "tableHeaderEnabled": { "type": "boolean", "default": false },
+        "tableHeaderHasFill": { "type": "boolean", "default": true },
+        "tableHeaderFill": { "$ref": "#/$defs/RGBAColor" },
+        "tableHeaderTextColor": { "$ref": "#/$defs/RGBAColor" },
+        "tableHeaderBold": { "type": "boolean", "default": true },
+        "tableHeaderSizeScale": { "type": "number", "default": 1, "description": "Header type size as a multiple of the body's." },
+        "tableBandEnabled": { "type": "boolean", "default": false },
+        "tableBandFill": { "$ref": "#/$defs/RGBAColor" }
+      }
+    }
+  }
+}
