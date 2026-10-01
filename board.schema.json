@@ -23,6 +23,10 @@
       "description": "Seconds Present-mode auto-play dwells on a slide. Absent means 3; values below 1 are clamped to 1 on read."
     },
     "autoplayLoop": { "type": "boolean" },
+    "hudPosition": {
+      "enum": ["topLeading", "top", "topTrailing", "leading", "center", "trailing", "bottomLeading", "bottom", "bottomTrailing"],
+      "description": "Where the presenter HUD sits while presenting. Absent means bottomTrailing; an unknown value also falls back to it instead of failing the open."
+    },
     "styleDefaults": { "$ref": "#/$defs/BoardStyleDefaults" },
     "groups": { "type": "array", "items": { "$ref": "#/$defs/BoardGroup" } }
   },
@@ -77,21 +81,21 @@
     },
     "BoardGroup": {
       "type": "object",
-      "description": "Membership lives on the items (BoardItem.groupID); this record only remembers the group box's angle. Decoded strictly: both keys required.",
-      "required": ["id", "rotation"],
+      "description": "Membership lives on the items (BoardItem.groupID); this record only remembers the group box's angle.",
+      "required": ["id"],
       "properties": {
         "id": { "$ref": "#/$defs/UUID" },
-        "rotation": { "type": "number", "description": "Degrees, 0..<360." }
+        "rotation": { "type": "number", "default": 0, "description": "Degrees, 0..<360." }
       }
     },
 
     "BoardItem": {
       "type": "object",
-      "required": ["id", "frame", "rotation", "content"],
+      "required": ["id", "frame", "content"],
       "properties": {
         "id": { "$ref": "#/$defs/UUID" },
         "frame": { "$ref": "#/$defs/CGRect" },
-        "rotation": { "type": "number", "description": "Degrees clockwise about the frame's center." },
+        "rotation": { "type": "number", "default": 0, "description": "Degrees clockwise about the frame's center." },
         "content": { "$ref": "#/$defs/ItemContent" },
         "groupID": { "$ref": "#/$defs/UUID" },
         "locked": { "type": "boolean", "default": false },
@@ -173,8 +177,7 @@
     },
     "TextOutline": {
       "type": "object",
-      "description": "Decoded strictly: all three keys required when the object is present.",
-      "required": ["enabled", "color", "width"],
+      "description": "Every key optional; absent keys take their defaults.",
       "properties": {
         "enabled": { "type": "boolean" },
         "color": { "$ref": "#/$defs/RGBAColor" },
@@ -233,12 +236,14 @@
 
     "NoteContent": {
       "type": "object",
-      "description": "Decoded strictly: unlike most of the model, every key is required.",
-      "required": ["string", "noteColor", "textColor", "bold", "italic", "alignment"],
+      "description": "Every key optional; absent keys take their defaults.",
       "properties": {
-        "string": { "type": "string" },
+        "string": { "type": "string", "default": "" },
         "noteColor": { "$ref": "#/$defs/RGBAColor" },
         "textColor": { "$ref": "#/$defs/RGBAColor" },
+        "fontSize": { "type": "number", "default": 20, "description": "Clamped to 6...800 on read." },
+        "fontFamily": { "type": "string", "description": "Absent = system font." },
+        "fontFace": { "type": "string", "description": "Absent = the family's default face." },
         "bold": { "type": "boolean" },
         "italic": { "type": "boolean" },
         "alignment": { "enum": ["leading", "center", "trailing"] }
@@ -303,8 +308,7 @@
     },
     "ImageBorder": {
       "type": "object",
-      "description": "Decoded strictly: all three keys required when the object is present.",
-      "required": ["enabled", "color", "width"],
+      "description": "Every key optional; absent keys take their defaults.",
       "properties": {
         "enabled": { "type": "boolean" },
         "color": { "$ref": "#/$defs/RGBAColor" },
@@ -395,16 +399,13 @@
 
     "Connector": {
       "type": "object",
-      "description": "Connectors are not items: they have no frame, they reference items, and they live outside the items array. Decoded strictly, so every non-optional key must be spelled out.",
-      "required": [
-        "id", "from", "to", "points", "color", "width", "routing", "dash",
-        "startArrow", "endArrow", "labelPosition", "labelBackground"
-      ],
+      "description": "Connectors are not items: they have no frame, they reference items, and they live outside the items array.",
+      "required": ["id", "from", "to"],
       "properties": {
         "id": { "$ref": "#/$defs/UUID" },
         "from": { "$ref": "#/$defs/ConnectorEndpoint" },
         "to": { "$ref": "#/$defs/ConnectorEndpoint" },
-        "points": { "type": "array", "items": { "$ref": "#/$defs/CGPoint" }, "description": "User-dragged waypoints." },
+        "points": { "type": "array", "items": { "$ref": "#/$defs/CGPoint" }, "default": [], "description": "User-dragged waypoints." },
         "color": { "$ref": "#/$defs/RGBAColor" },
         "width": { "type": "number" },
         "routing": { "enum": ["straight", "step", "curved"] },
@@ -470,6 +471,9 @@
         "shapeLabelOutlineWidth": { "type": "number", "default": 3 },
         "noteColor": { "$ref": "#/$defs/RGBAColor" },
         "noteTextColor": { "$ref": "#/$defs/RGBAColor" },
+        "noteFont": { "type": "string", "default": "" },
+        "noteFace": { "type": "string", "default": "" },
+        "noteSize": { "type": "number", "default": 20 },
         "textFont": { "type": "string", "default": "" },
         "textFace": { "type": "string", "default": "" },
         "textSize": { "type": "number", "default": 24 },

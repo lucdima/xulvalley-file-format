@@ -39,13 +39,15 @@ Past the schema, the validator checks three things a schema has no way to expres
 - every connector and group points at an item that exists
 - the items array is sorted by its order keys
 
+Without `jsonschema` installed it still checks those, and every key the app cannot open a document without; it just doesn't check value types.
+
 ## The samples
 
 **`minimal.xulvalley`** is the smallest board that opens. One key, one item. Everything else falls back to a default.
 
 **`diagram.xulvalley`** has five elements and four connectors. One connector carries a label. One has an end that floats free in space.
 
-**`kitchen-sink.xulvalley`** uses all ten element kinds. Its `media/` folder holds real bytes, so the board opens with nothing missing. It also carries the parts that are easy to get wrong by hand: captions, a group, a locked item, per-character colour and emphasis spans, a saved camera position, and the full set of per-document style defaults.
+**`kitchen-sink.xulvalley`** uses all ten element kinds. Its `media/` folder holds real bytes, so the board opens with nothing missing. It also carries the parts that are easy to get wrong by hand: captions, a group, a locked item, per-character color and emphasis spans, a saved camera position, and the full set of per-document style defaults.
 
 `diagram` and `kitchen-sink` are byte-identical to what the app's own encoder writes, so they show the exact shape of a saved file, down to the keys sitting at their default. `minimal` is hand-written, to show how little a board needs.
 

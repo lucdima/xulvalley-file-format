@@ -91,29 +91,32 @@ The top-level object.
 | `connectors` | `[Connector]` | no | `[]` |
 | `background` | `RGBAColor` | no | canvas background |
 | `pattern` | `"none"` \| `"dots"` \| `"grid"` \| `"lines"` | no | `"dots"` |
-| `patternColor` | `RGBAColor` | no | pattern grey |
-| `viewport` | `{ "center": CGPoint, "scale": number }` | no | absent |
+| `patternColor` | `RGBAColor` | no | pattern gray |
+| `viewport` | `{ "center": CGPoint, "scale": number }` | no | absent. Both keys required when present. |
 | `transition` | `"ease"` \| `"fly"` \| `"direct"` | no | absent = `"ease"` |
 | `slidePause` | int (seconds) | no | absent = 3, clamped to a 1-second minimum |
 | `autoplayLoop` | bool | no | absent |
+| `hudPosition` | `"topLeading"` \| `"top"` \| `"topTrailing"` \| `"leading"` \| `"center"` \| `"trailing"` \| `"bottomLeading"` \| `"bottom"` \| `"bottomTrailing"` | no | absent = `"bottomTrailing"` |
 | `styleDefaults` | `BoardStyleDefaults` | no | absent |
 | `groups` | `[BoardGroup]` | no | omitted when empty |
 
+`hudPosition` is where the presenter HUD sits while presenting — per-document, because the corner that stays out of the way depends on where the board puts its content. It is the one key here decoded through its **raw value** rather than as its enum: a position string this build has no case for falls back to the default instead of failing the open, since a newer build's chrome choice is no reason to refuse a file. New boards are seeded from an app preference; every board after that answers for itself.
+
 `items` is the only key a board cannot be written without. `viewport` records pan and zoom so reopening restores the camera. It is the one key that changes when the user only *looked* around, so expect it in diffs after a scroll.
 
-`groups` is membership metadata only: an item's own `groupID` is what puts it in a group. A `BoardGroup` is `{ "id": UUID, "rotation": number }`.
+`groups` is membership metadata only: an item's own `groupID` is what puts it in a group. A `BoardGroup` is `{ "id": UUID, "rotation": number }`; `id` is required, `rotation` defaults to `0`.
 
-`styleDefaults` (`BoardStyleDefaults`) is the per-document "what a new shape/text/note/connector/table/caption looks like", 50 flat keys tracking the last style used. See [Style defaults](#style-defaults).
+`styleDefaults` (`BoardStyleDefaults`) is the per-document "what a new shape/text/note/connector/table/caption looks like", 53 flat keys tracking the last style used. See [Style defaults](#style-defaults).
 
 ## Style defaults
 
-`styleDefaults` is one flat object of 50 optional keys: the look a newly created element inherits **on this board**. Every whole-element style edit writes them back, so they track the last style used. Absent means the factory value, and an absent object means all of them.
+`styleDefaults` is one flat object of 53 optional keys: the look a newly created element inherits **on this board**. Every whole-element style edit writes them back, so they track the last style used. Absent means the factory value, and an absent object means all of them.
 
 | Group | Keys |
 | --- | --- |
 | Shape | `shapeHasFill`, `shapeFill`, `shapeHasBorder`, `shapeStroke`, `shapeStrokeWidth`, `shapeRandomStyle` |
 | Shape label | `shapeLabelColor`, `shapeLabelFont`, `shapeLabelFace`, `shapeLabelOutlineEnabled`, `shapeLabelOutlineColor`, `shapeLabelOutlineWidth` |
-| Note | `noteColor`, `noteTextColor` |
+| Note | `noteColor`, `noteTextColor`, `noteFont`, `noteFace`, `noteSize` |
 | Text | `textFont`, `textFace`, `textSize`, `textColor`, `textOutlineEnabled`, `textOutlineColor`, `textOutlineWidth` |
 | Connector | `connectorColor`, `connectorWidth`, `connectorRouting`, `connectorDash`, `connectorStartArrow`, `connectorEndArrow` |
 | Caption | `captionColor`, `captionFont`, `captionFace`, `captionSize`, `captionBackground`, `captionBackgroundOpacity` |
@@ -138,7 +141,7 @@ An entry in `items`.
 | --- | --- | --- | --- |
 | `id` | UUID | **yes** | Stable for the life of the item. See [Guarantees](#guarantees-for-tools). |
 | `frame` | `CGRect` | **yes** | Bounding box in world space, always axis-aligned. |
-| `rotation` | number | **yes** | Degrees clockwise about the frame's center. |
+| `rotation` | number | no | Absent = `0`. Degrees clockwise about the frame's center. The app always writes it. |
 | `content` | `ItemContent` | **yes** | The payload; one key, named for the kind. |
 | `groupID` | UUID | no | Group membership; absent = ungrouped. |
 | `locked` | bool | no | Omitted when `false`. Blocks editing. The item stays selectable. |
@@ -178,9 +181,9 @@ The same type serves as a shape's label, a connector's label, a caption's text a
 | `emphasisSpans` | `[TextEmphasisSpan]` | `[]` |
 | `outline` | `TextOutline`? | absent |
 | `width` | number? | absent = content-sized |
-| `height` | number? | absent |
+| `height` | number? | absent = hugs the text; a value is a **minimum** box height (the box still grows to fit; a text box never clips) |
 
-A `TextColorSpan` is `{ "start": int, "length": int, "color": RGBAColor }`, with offsets in characters. A `TextEmphasisSpan` is `{ "start", "length" }` plus any of `bold`, `italic`, `underline`, `strikethrough` as optional bools, where an absent trait means "inherit". A `TextOutline` is `{ "enabled": bool, "color": RGBAColor, "width": number }`.
+A `TextColorSpan` is `{ "start": int, "length": int, "color": RGBAColor }`, with offsets in characters. A `TextEmphasisSpan` is `{ "start", "length" }` plus any of `bold`, `italic`, `underline`, `strikethrough` as optional bools, where an absent trait means "inherit". A `TextOutline` is `{ "enabled": bool, "color": RGBAColor, "width": number }`, each optional (defaults `true`, white, `2`).
 
 ### `shape` (`ShapeContent`)
 
@@ -218,10 +221,13 @@ A `VectorGlyph` is inlined into the document. Path data is small, and keeping it
 | `string` | string | `""` |
 | `noteColor` | `RGBAColor` | note yellow |
 | `textColor` | `RGBAColor` | text color |
+| `fontSize` | number | `20` (clamped to 6…800 on read) |
+| `fontFamily` | string | absent = system font |
+| `fontFace` | string | absent = the family's default face |
 | `bold`, `italic` | bool | `false` |
 | `alignment` | `"leading"` \| `"center"` \| `"trailing"` | `"leading"` |
 
-Unlike most of the model, **every one of these keys is required on read**. See [Sharp edges](#sharp-edges).
+Every key is optional on read (since 2026-09-18, when `fontSize`/`fontFamily`/`fontFace` were added and the type gained a lenient decoder).
 
 ### `image` (`ImageContent`)
 
@@ -237,7 +243,7 @@ Unlike most of the model, **every one of these keys is required on read**. See [
 | `grayscale` | bool | `false` |
 | `originalMedia` | string? | absent. The pre-edit blob, when one is kept. |
 
-A `CropRect` is `{ "x", "y", "width", "height" }` in **unit coordinates** (0…1) of the source image, minimum side 0.02. An `ImageBorder` is `{ "enabled": bool, "color": RGBAColor, "width": number }`, all three required when the object is present.
+A `CropRect` is `{ "x", "y", "width", "height" }` in **unit coordinates** (0…1) of the source image, minimum side 0.02. An `ImageBorder` is `{ "enabled": bool, "color": RGBAColor, "width": number }`, each optional (defaults `true`, shape stroke, `3`).
 
 ### `video` (`VideoContent`) and `audio` (`AudioContent`)
 
@@ -345,7 +351,7 @@ What is *not* guaranteed: the schema itself is pre-1.0 and will change before re
 
 Things to check when writing a board by hand.
 
-- **Most of the model decodes leniently, and some of it does not.** Where a type has a custom decoder, every key is optional and falls back to its default: `BoardModel`, `BoardItem`, `TextContent`, `ShapeContent`, `ImageContent`, `VideoContent`, `AudioContent`, `PDFContent`, `SlideContent`, `LinkContent`, `TableContent`, `TableCellContent`, `ItemCaption`, `BoardStyleDefaults`, and `VectorGlyph` (for `tags` and `category` only). Where it doesn't, Swift's synthesized decoding **throws on an absent key even when the property has a default**. So `NoteContent`, `Connector`, `ImageBorder`, `TextOutline`, `BoardGroup`, `Viewport`, `TextColorSpan`, `TextEmphasisSpan` and `VectorPathData` want every non-optional key spelled out. Round-tripping through the app always produces complete objects, so this only bites hand-written JSON. It also means adding a field to one of those types breaks existing files unless a lenient decoder is added in the same commit.
+- **A key with a default is optional; the rest are required, and that list is short.** Every default in the tables above is applied on read, so a hand-written board may leave those keys out. The keys a board cannot be written without are exactly: `items` on the board; `id`, `frame` and `content` on an item; `id`, `from` and `to` on a connector; `id` on a group; `center` and `scale` on a viewport; `start`, `length` (and `color`, on a color span) on a span; `media` and `naturalSize` on image and video, `media` on audio, plus `pageCount` on pdf; `url` on a link; `text` on a caption; `id`, `name`, `size` and `paths` on a vector glyph, and `d` on a path. A missing required key fails the open. The app itself always writes complete objects, so this only matters for JSON written by hand or by another tool.
 - **`frame` on a table is advisory.** It is recomputed from the tracks.
 - **`z` and array order can disagree.** The keys win, except when the array order changed relative to the previous state, in which case the array is taken as the intent. If you are generating a board from scratch, pick one: either write `z` on every item or on none.
 - **Span offsets are character offsets** into `string`, and never UTF-8 byte offsets. A span that runs past the end of the string is clamped, and the file still opens.

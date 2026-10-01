@@ -9,8 +9,9 @@ references resolve to files whose bytes hash to their own name, that ids
 referenced by connectors and groups exist, and that the items array is sorted by
 its order keys.
 
-The JSON Schema check needs `pip install jsonschema`; without it the structural
-checks still run.
+The full JSON Schema check needs `pip install jsonschema`. Without it the
+structural checks still run, and so does a check of every key the app cannot open
+a document without.
 """
 import argparse
 import hashlib
@@ -25,10 +26,25 @@ SCHEMA = os.path.join(os.path.dirname(HERE), "board.schema.json")
 # key is not an error — but it is almost always a typo, which --strict reports.
 KNOWN = {
     "board": {"version", "items", "connectors", "background", "pattern", "patternColor",
-              "viewport", "transition", "slidePause", "autoplayLoop", "styleDefaults", "groups"},
+              "viewport", "transition", "slidePause", "autoplayLoop", "hudPosition",
+              "styleDefaults", "groups"},
     "item": {"id", "frame", "rotation", "content", "groupID", "locked", "caption", "z"},
     "connector": {"id", "from", "to", "points", "color", "width", "routing", "dash",
                   "startArrow", "endArrow", "label", "labelPosition", "labelBackground", "above"},
+}
+# Keys the app cannot open a document without. Every other key has a default and may
+# be left out. Kept here as well as in the schema so the check runs without jsonschema.
+REQUIRED = {
+    "board": ["items"],
+    "item": ["id", "frame", "content"],
+    "connector": ["id", "from", "to"],
+    "group": ["id"],
+    "viewport": ["center", "scale"],
+    "image": ["media", "naturalSize"],
+    "video": ["media", "naturalSize"],
+    "audio": ["media"],
+    "pdf": ["media", "naturalSize", "pageCount"],
+    "link": ["url"],
 }
 KINDS = {"text", "shape", "note", "image", "video", "audio", "pdf", "slide", "link", "table"}
 ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -70,6 +86,31 @@ def check_package(path, strict=False, schema=None):
         for e in sorted(validator.iter_errors(board), key=lambda e: list(e.path)):
             where = "/".join(str(p) for p in e.path) or "(root)"
             problems.append("schema: %s: %s" % (where, e.message))
+
+    def need(obj, kind, where):
+        if not isinstance(obj, dict):
+            problems.append("%s is not an object" % where)
+            return
+        for key in REQUIRED[kind]:
+            if key not in obj:
+                problems.append("%s has no %r — required, the app will not open this"
+                                % (where, key))
+
+    need(board, "board", "board")
+    if "viewport" in board:
+        need(board["viewport"], "viewport", "viewport")
+    for i, it in enumerate(board.get("items", [])):
+        where = "item %s" % (it.get("id", "#%d" % i) if isinstance(it, dict) else "#%d" % i)
+        need(it, "item", where)
+        content = it.get("content") if isinstance(it, dict) else None
+        if isinstance(content, dict):
+            for kind, payload in content.items():
+                if kind in REQUIRED and isinstance(payload, dict):
+                    need(payload.get("_0"), kind, "%s (%s)" % (where, kind))
+    for i, c in enumerate(board.get("connectors", [])):
+        need(c, "connector", "connector %s" % (c.get("id", "#%d" % i) if isinstance(c, dict) else "#%d" % i))
+    for i, g in enumerate(board.get("groups", [])):
+        need(g, "group", "group #%d" % i)
 
     items = board.get("items", [])
     ids = {i.get("id") for i in items if isinstance(i, dict)}
@@ -158,8 +199,8 @@ def main():
         with open(SCHEMA) as f:
             schema = json.load(f)
     except ImportError:
-        print("note: jsonschema is not installed — running structural checks only "
-              "(pip install jsonschema)\n", file=sys.stderr)
+        print("note: jsonschema is not installed — checking required keys and structure "
+              "only, not value types (pip install jsonschema)\n", file=sys.stderr)
 
     failed = 0
     for path in args.packages:
