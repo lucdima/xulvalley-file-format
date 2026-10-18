@@ -18,7 +18,7 @@ Board.xulvalley/
 | | |
 | --- | --- |
 | [`file-format.md`](file-format.md) | The spec. Every key, its type, its default, and the sharp edges. |
-| [`board.schema.json`](board.schema.json) | JSON Schema (draft 2020-12) for `board.json`, format version 1. |
+| [`board.schema.json`](board.schema.json) | JSON Schema (draft 2020-12) for `board.json`, format version 2. |
 | [`samples/`](samples) | Three real documents, from the smallest board that opens to one using every element kind. |
 | [`tools/validate.py`](tools/validate.py) | Checks a document against the schema, and against what a schema cannot say. |
 
@@ -61,7 +61,7 @@ Without `jsonschema` installed it still checks those, and every key the app cann
 
 ## Format version
 
-`board.json` carries a top-level `"version"` integer. **The current format is 1**, and an absent key means 1.
+`board.json` carries a top-level `"version"` integer. **The current format is 2**, and an absent key means 1. The one move so far: version 2 (2026-10-18) added the `"crossfade"` and `"fade"` values of `transition`; everything else added since the stamp was a new key, so files kept opening everywhere. The samples here are stamped 1 and use none of the version-2 values, so every build opens them.
 
 A new key does not bump it. Decoding is tolerant across most of the model, so an older build ignores a key it has no slot for and the board opens. A new value in a string-backed enum does bump it, because an unknown string is a decode error that takes the whole file down with it. A build that meets a file stamped higher than its own refuses to open it and says why.
 

@@ -27,7 +27,7 @@ Three things a tool outside the app should know:
 
 ## Format version
 
-`board.json` carries a top-level `"version"` integer. The current format is **1**.
+`board.json` carries a top-level `"version"` integer. The current format is **2**.
 
 - The key is stamped by the writer at save time, so it always names the build that actually wrote the file. The build that first created the board leaves no trace.
 - **Absent means 1**: files written before the stamp existed, and models that are not saved documents at all (the bundled templates leave the key out entirely).
@@ -40,7 +40,14 @@ When the number moves:
 | A new **key** on an existing object | No | An older build ignores it and opens the board. |
 | A new **value** in a string-backed enum (an item kind, a connector dash, a background pattern) | **Yes** | An older build cannot decode it, and the whole file fails to open. |
 
-The version has not moved yet, so both rows are best read as what *would* happen.
+The version has moved once:
+
+| Version | Since | What needs it |
+| --- | --- | --- |
+| 1 | the first stamp | — |
+| 2 | 2026-10-18 | the `"fade"` and `"crossfade"` values of `transition` |
+
+A version-1 build meets `"transition": "crossfade"`, cannot decode it, and refuses the file — which is the second row of the table above happening for real. Every other key added since the stamp was a new key, so the files kept opening everywhere.
 
 **A new key.** `locked` and `z` were both added to `BoardItem` after boards had already been saved without them. An item written today looks like this:
 
@@ -93,12 +100,15 @@ The top-level object.
 | `pattern` | `"none"` \| `"dots"` \| `"grid"` \| `"lines"` | no | `"dots"` |
 | `patternColor` | `RGBAColor` | no | pattern gray |
 | `viewport` | `{ "center": CGPoint, "scale": number }` | no | absent. Both keys required when present. |
-| `transition` | `"ease"` \| `"fly"` \| `"direct"` | no | absent = `"ease"` |
+| `transition` | `"ease"` \| `"fly"` \| `"crossfade"` \| `"fade"` \| `"direct"` | no | absent = `"ease"`. `"crossfade"` and `"fade"` need format 2. |
+| `transitionSpeed` | `"slow"` \| `"normal"` \| `"fast"` | no | absent = `"normal"` |
 | `slidePause` | int (seconds) | no | absent = 3, clamped to a 1-second minimum |
 | `autoplayLoop` | bool | no | absent |
 | `hudPosition` | `"topLeading"` \| `"top"` \| `"topTrailing"` \| `"leading"` \| `"center"` \| `"trailing"` \| `"bottomLeading"` \| `"bottom"` \| `"bottomTrailing"` | no | absent = `"bottomTrailing"` |
 | `styleDefaults` | `BoardStyleDefaults` | no | absent |
 | `groups` | `[BoardGroup]` | no | omitted when empty |
+
+`transitionSpeed` scales the transition's duration (`slow` ×1.6, `fast` ×0.65) and means nothing when `transition` is `"direct"`. Like `hudPosition` below it is decoded through its raw value, so a speed this build has no case for falls back to `"normal"` rather than failing the open.
 
 `hudPosition` is where the presenter HUD sits while presenting — per-document, because the corner that stays out of the way depends on where the board puts its content. It is the one key here decoded through its **raw value** rather than as its enum: a position string this build has no case for falls back to the default instead of failing the open, since a newer build's chrome choice is no reason to refuse a file. New boards are seeded from an app preference; every board after that answers for itself.
 
