@@ -17,13 +17,15 @@ Board.xulvalley/
   board.json              the model, everything in this document
   media/<sha256>.<ext>    binary files, named by content hash
   collab/<replica>.json   per-field merge state (optional)
+  quicklook/thumbnail.png a picture of the board (optional)
 ```
 
-Three things a tool outside the app should know:
+Four things a tool outside the app should know:
 
 - **`board.json` alone is a complete board.** A package with no `collab/` opens as precisely what `board.json` says. Deleting `collab/` is safe and lossless for a single copy of a document. It costs only the ability to merge that copy against another copy of the same board edited elsewhere. **If you keep boards in git, ignore `collab/`.** It carries nothing you can read. Its diffs are localized (a stamp changes only for a field that was actually written, so a save with no edits produces no diff at all), but it is machine state, and each replica file holds a whole model, so an N-writer package is roughly N× `board.json`.
 - **`board.json` is regenerated in full on every save.** Every save writes the whole file out of the model held in memory. Rewriting it by hand is legitimate; the app reads what you wrote.
 - **Media is never inlined.** `media/` holds the bytes under a content-addressed name, `<sha256hex>.<ext>` (extension lowercased). Model fields that name media hold that bare filename. A blob no item references is dropped on the next save.
+- **`quicklook/thumbnail.png` is derived and never read.** A PNG of the whole board, at most 512 px on its longer side, which Finder and the app's welcome window show. The app ignores it on open, so a tool that changes `board.json` can leave it stale or delete it. The next edit in the app replaces it. A package without one is complete.
 
 ## Format version
 
@@ -116,11 +118,11 @@ The top-level object.
 
 `groups` is membership metadata only: an item's own `groupID` is what puts it in a group. A `BoardGroup` is `{ "id": UUID, "rotation": number }`; `id` is required, `rotation` defaults to `0`.
 
-`styleDefaults` (`BoardStyleDefaults`) is the per-document "what a new shape/text/note/connector/table/caption looks like", 53 flat keys tracking the last style used. See [Style defaults](#style-defaults).
+`styleDefaults` (`BoardStyleDefaults`) is the per-document "what a new shape/text/note/connector/table/caption/link card looks like", 53 flat keys plus one nested `linkLook`, tracking the last style used. See [Style defaults](#style-defaults).
 
 ## Style defaults
 
-`styleDefaults` is one flat object of 53 optional keys: the look a newly created element inherits **on this board**. Every whole-element style edit writes them back, so they track the last style used. Absent means the factory value, and an absent object means all of them.
+`styleDefaults` is one flat object of 53 optional keys, plus the nested `linkLook`: the look a newly created element inherits **on this board**. Every whole-element style edit writes them back, so they track the last style used. Absent means the factory value, and an absent object means all of them.
 
 | Group | Keys |
 | --- | --- |
@@ -133,6 +135,7 @@ The top-level object.
 | Slide | `slideAspect` |
 | Table | `tableFill`, `tableTextColor`, `tableFont`, `tableFace`, `tableTextSize`, `tableGridColor`, `tableGridWidth`, `tableRandomStyle` |
 | Table header & banding | `tableHeaderEnabled`, `tableHeaderHasFill`, `tableHeaderFill`, `tableHeaderTextColor`, `tableHeaderBold`, `tableHeaderSizeScale`, `tableBandEnabled`, `tableBandFill` |
+| Link card | `linkLook` — one nested object with the look keys of [`link`](#link-linkcontent) (`showsImage` … `transparentBackground`), each optional with the same defaults |
 
 The names say the types: anything ending `Color`, `Fill`, `Stroke` or `Background` is an `RGBAColor`; `Font` and `Face` are strings; `Width`, `Size`, `Scale` and `Opacity` are numbers; the rest are bools. The three exceptions are `connectorRouting`, `connectorDash` and `slideAspect`, which take the same values as the element fields of those names.
 
@@ -276,10 +279,20 @@ A `CropRect` is `{ "x", "y", "width", "height" }` in **unit coordinates** (0…1
 | `summary` | string? | absent |
 | `imageMedia` | string? | absent. The fetched preview image, in `media/`. |
 | `imageNaturalSize` | `CGSize`? | absent |
-| `showsPreview` | bool | `true` |
+| `showsPreview` | bool | `true`. The collapse: `false` draws only the address row. |
+| `showsImage` | bool | `true` |
+| `showsTitle` | bool | `true` |
+| `showsSummary` | bool | `true` |
+| `showsAddress` | bool | `true`. Read only while the card is expanded; a collapsed card always draws its address row. |
+| `titleSize` | number | `15`, world units, clamped to 4…200 |
+| `summarySize` | number | `12`, world units, clamped to 4…200 |
+| `summaryLines` | integer | `3`. How many description lines are drawn; `0` means every line, and the picture then takes whatever height is left. Clamped to 0…12. |
+| `imageFit` | `"fill"` \| `"fit"` | `"fill"` (cropped to the band); `"fit"` shows the whole picture |
 | `transparentBackground` | bool | `true` |
 
 `title`, `summary` and `imageMedia` are Open Graph metadata fetched from the URL. This is the app's **only** network path, and it is outbound-only.
+
+The keys from `showsImage` down are the card's **look** (`LinkLook` in code), written flat beside the others rather than as a `look` object, each only when it differs from its default — so a default card is still just `{"url": …}`, a file from before the look opens unchanged, and each option merges as a field of its own.
 
 ### `table` (`TableContent`)
 

@@ -356,7 +356,24 @@
         "summary": { "type": "string", "description": "Open Graph metadata fetched from the URL." },
         "imageMedia": { "$ref": "#/$defs/MediaName", "description": "The fetched preview image, stored in media/." },
         "imageNaturalSize": { "$ref": "#/$defs/CGSize" },
-        "showsPreview": { "type": "boolean", "default": true },
+        "showsPreview": { "type": "boolean", "default": true, "description": "The collapse: false draws only the address row." }
+      },
+      "allOf": [{ "$ref": "#/$defs/LinkLook" }],
+      "description": "The card's look (LinkLook) is written flat beside these keys, each only when it differs from its default."
+    },
+
+    "LinkLook": {
+      "type": "object",
+      "description": "A link card's look: which parts show, the type sizes, the description's line count, how the picture fills its band, and the backing. Flat inside a link item; nested as styleDefaults.linkLook.",
+      "properties": {
+        "showsImage": { "type": "boolean", "default": true },
+        "showsTitle": { "type": "boolean", "default": true },
+        "showsSummary": { "type": "boolean", "default": true },
+        "showsAddress": { "type": "boolean", "default": true, "description": "Read only while the card is expanded; a collapsed card always draws its address row." },
+        "titleSize": { "type": "number", "default": 15, "description": "World units; clamped to 4...200 on read." },
+        "summarySize": { "type": "number", "default": 12, "description": "World units; clamped to 4...200 on read." },
+        "summaryLines": { "type": "integer", "default": 3, "description": "Description lines drawn; 0 means every line. Clamped to 0...12 on read." },
+        "imageFit": { "enum": ["fill", "fit"], "default": "fill" },
         "transparentBackground": { "type": "boolean", "default": true }
       }
     },
@@ -521,7 +538,8 @@
         "tableHeaderBold": { "type": "boolean", "default": true },
         "tableHeaderSizeScale": { "type": "number", "default": 1, "description": "Header type size as a multiple of the body's." },
         "tableBandEnabled": { "type": "boolean", "default": false },
-        "tableBandFill": { "$ref": "#/$defs/RGBAColor" }
+        "tableBandFill": { "$ref": "#/$defs/RGBAColor" },
+        "linkLook": { "$ref": "#/$defs/LinkLook", "description": "What a new link card looks like. Always written; {} when every key is at its default." }
       }
     }
   }
