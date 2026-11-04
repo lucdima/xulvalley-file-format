@@ -25,7 +25,10 @@ Four things a tool outside the app should know:
 - **`board.json` alone is a complete board.** A package with no `collab/` opens as precisely what `board.json` says. Deleting `collab/` is safe and lossless for a single copy of a document. It costs only the ability to merge that copy against another copy of the same board edited elsewhere. **If you keep boards in git, ignore `collab/`.** It carries nothing you can read. Its diffs are localized (a stamp changes only for a field that was actually written, so a save with no edits produces no diff at all), but it is machine state, and each replica file holds a whole model, so an N-writer package is roughly N× `board.json`.
 - **`board.json` is regenerated in full on every save.** Every save writes the whole file out of the model held in memory. Rewriting it by hand is legitimate; the app reads what you wrote.
 - **Media is never inlined.** `media/` holds the bytes under a content-addressed name, `<sha256hex>.<ext>` (extension lowercased). Model fields that name media hold that bare filename. A blob no item references is dropped on the next save.
-- **`quicklook/thumbnail.png` is derived and never read.** A PNG of the whole board, at most 512 px on its longer side, which Finder and the app's welcome window show. The app ignores it on open, so a tool that changes `board.json` can leave it stale or delete it. The next edit in the app replaces it. A package without one is complete.
+- **`quicklook/thumbnail.png` is an optional preview, derived from the board.** Finder and the app's welcome window show it. The app doesn't read it when opening a board, so it can't change what's on the board. A package without one is complete.
+  - **What the app writes:** a PNG of every item, at most 512 px on its longer side. Very long boards are widened so the ratio never passes 2:1, and an empty board shows just its background.
+  - **When it changes:** after an edit. Saving without an edit keeps the existing picture. A package without one shows the document icon until its next edit.
+  - **If your tool changes `board.json`:** delete or replace the thumbnail. Otherwise it goes stale, and it may still show content you removed.
 
 ## Format version
 
@@ -264,7 +267,9 @@ A `CropRect` is `{ "x", "y", "width", "height" }` in **unit coordinates** (0…1
 
 ### `pdf` (`PDFContent`)
 
-`media`, `naturalSize` and `pageCount` are required. `pageIndex` (default `0`), `border`, `cornerRadius` and `showsPageControls` (default `true`) are optional.
+`media`, `naturalSize` and `pageCount` are required. `pageIndex` (default `0`), `border`, `cornerRadius`, `showsPageControls` (default `true`), `twoUp` (default `false`) and `coverAlone` (default `true`) are optional.
+
+`twoUp` shows two pages side by side, like an open magazine, with the pair worked out from `pageIndex`. The item's shape then follows two `naturalSize` widths, so turning it on in the app doubles the frame's width. `coverAlone` only matters in `twoUp`: `true` puts the first page alone on the right, as in a bound book, and `false` pairs from the very first page (1│2, 3│4, …).
 
 ### `slide` (`SlideContent`)
 
@@ -368,7 +373,7 @@ These are the properties a script, a diffing tool or a model can rely on.
 - **Values a build can't understand are refused.** A key an older build doesn't know is ignored on read and gone after its next save, so a round-trip through an older build can lose newly added fields. See [Format version](#format-version).
 - **The readable file is the whole document.** No part of a board lives only in `collab/`.
 
-What is *not* guaranteed: the schema itself is pre-1.0 and will change before release. The `version` key is what makes changing it safe. It is no promise that the schema will stay put.
+What is *not* guaranteed: that the schema stays as it is. A new key can appear in any release, and a change an older build can't read moves `version`, which is what makes changing it safe.
 
 ## Sharp edges
 

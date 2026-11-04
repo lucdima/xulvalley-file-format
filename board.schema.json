@@ -306,7 +306,9 @@
         "pageCount": { "type": "integer", "minimum": 1 },
         "border": { "$ref": "#/$defs/ImageBorder" },
         "cornerRadius": { "type": "number", "default": 0 },
-        "showsPageControls": { "type": "boolean", "default": true }
+        "showsPageControls": { "type": "boolean", "default": true },
+        "twoUp": { "type": "boolean", "default": false, "description": "Show two pages side by side. The pair is worked out from pageIndex." },
+        "coverAlone": { "type": "boolean", "default": true, "description": "In twoUp, whether the first page stands alone on the right. False pairs from the very first page." }
       }
     },
     "MediaName": {

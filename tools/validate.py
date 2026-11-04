@@ -6,8 +6,8 @@
 
 Beyond the schema, this checks the things a schema cannot express: that media
 references resolve to files whose bytes hash to their own name, that ids
-referenced by connectors and groups exist, and that the items array is sorted by
-its order keys.
+referenced by connectors and groups exist, that the items array is sorted by its
+order keys, and that a quicklook/thumbnail.png, if there is one, is a real PNG.
 
 The full JSON Schema check needs `pip install jsonschema`. Without it the
 structural checks still run, and so does a check of every key the app cannot open
@@ -17,6 +17,7 @@ import argparse
 import hashlib
 import json
 import os
+import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -26,7 +27,8 @@ SCHEMA = os.path.join(os.path.dirname(HERE), "board.schema.json")
 # key is not an error — but it is almost always a typo, which --strict reports.
 KNOWN = {
     "board": {"version", "items", "connectors", "background", "pattern", "patternColor",
-              "viewport", "transition", "slidePause", "autoplayLoop", "hudPosition",
+              "viewport", "transition", "transitionSpeed", "slidePause", "autoplayLoop",
+              "hudPosition",
               "styleDefaults", "groups"},
     "item": {"id", "frame", "rotation", "content", "groupID", "locked", "caption", "z"},
     "connector": {"id", "from", "to", "points", "color", "width", "routing", "dash",
@@ -48,6 +50,8 @@ REQUIRED = {
 }
 KINDS = {"text", "shape", "note", "image", "video", "audio", "pdf", "slide", "link", "table"}
 ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+THUMBNAIL_MAX_SIDE = 512
 
 
 def order_value(key):
@@ -67,6 +71,29 @@ def media_names(content):
         for field in ("media", "originalMedia", "imageMedia"):
             if isinstance(body, dict) and body.get(field):
                 yield body[field]
+
+
+def check_thumbnail(path):
+    """Check quicklook/thumbnail.png: (problems, notes). The file is optional, and only
+    a broken one is a problem. Its size and shape are what the app happens to write, so
+    a tool's own preview outside them gets a note, not a failure."""
+    thumbnail = os.path.join(path, "quicklook", "thumbnail.png")
+    if not os.path.isfile(thumbnail):
+        return [], []
+    with open(thumbnail, "rb") as f:
+        head = f.read(24)
+    if len(head) < 24 or head[:8] != PNG_SIGNATURE or head[12:16] != b"IHDR":
+        return ["quicklook/thumbnail.png is not a PNG"], []
+    width, height = struct.unpack(">II", head[16:24])
+    notes = []
+    if max(width, height) > THUMBNAIL_MAX_SIDE:
+        notes.append("quicklook/thumbnail.png is %dx%d; the app writes at most %d px on "
+                     "the longer side" % (width, height, THUMBNAIL_MAX_SIDE))
+    # One pixel of slack on the short side, for rounding.
+    if max(width, height) > 2 * (min(width, height) + 1):
+        notes.append("quicklook/thumbnail.png is %dx%d; the app keeps the ratio within "
+                     "2:1" % (width, height))
+    return [], notes
 
 
 def check_package(path, strict=False, schema=None):
@@ -205,6 +232,8 @@ def main():
     failed = 0
     for path in args.packages:
         problems = check_package(path.rstrip("/"), strict=args.strict, schema=schema)
+        thumbnail_problems, notes = check_thumbnail(path.rstrip("/"))
+        problems += thumbnail_problems
         name = os.path.basename(path.rstrip("/"))
         if problems:
             failed += 1
@@ -213,6 +242,8 @@ def main():
                 print("    %s" % p)
         else:
             print("✓ %s" % name)
+        for n in notes:
+            print("    note: %s" % n)
     return 1 if failed else 0
 
 
