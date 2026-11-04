@@ -23,7 +23,7 @@ Board.xulvalley/
 Four things a tool outside the app should know:
 
 - **`board.json` alone is a complete board.** A package with no `collab/` opens as precisely what `board.json` says. Deleting `collab/` is safe and lossless for a single copy of a document. It costs only the ability to merge that copy against another copy of the same board edited elsewhere. **If you keep boards in git, ignore `collab/`.** It carries nothing you can read. Its diffs are localized (a stamp changes only for a field that was actually written, so a save with no edits produces no diff at all), but it is machine state, and each replica file holds a whole model, so an N-writer package is roughly N× `board.json`.
-- **`board.json` is regenerated in full on every save.** Every save writes the whole file out of the model held in memory. Rewriting it by hand is legitimate; the app reads what you wrote.
+- **`board.json` is regenerated in full on every save.** Every save writes the whole file out of the model held in memory. Rewriting it by hand is legitimate; see [Editing a saved board](#editing-a-saved-board).
 - **Media is never inlined.** `media/` holds the bytes under a content-addressed name, `<sha256hex>.<ext>` (extension lowercased). Model fields that name media hold that bare filename. A blob no item references is dropped on the next save.
 - **`quicklook/thumbnail.png` is an optional preview, derived from the board.** Finder and the app's welcome window show it. The app doesn't read it when opening a board, so it can't change what's on the board. A package without one is complete.
   - **What the app writes:** a PNG of every item, at most 512 px on its longer side. Very long boards are widened so the ratio never passes 2:1, and an empty board shows just its background.
@@ -374,6 +374,14 @@ These are the properties a script, a diffing tool or a model can rely on.
 - **The readable file is the whole document.** No part of a board lives only in `collab/`.
 
 What is *not* guaranteed: that the schema stays as it is. A new key can appear in any release, and a change an older build can't read moves `version`, which is what makes changing it safe.
+
+## Editing a saved board
+
+Changing a board from outside the app, by hand or with a script or an AI tool, is legitimate. **For now, we recommend closing the board in the app first.** The app doesn't notice outside changes: an open board keeps its own copy in memory, shows no warning, and its next save writes over your edit. This is a recommendation, not a rule. A careful tool may manage with the board open, but nothing in the app protects that edit.
+
+If the package has a `collab/` folder, make the same change to `board.json` and to `model` in every `collab/*.json`, and leave the stamps alone. On open, the app starts from this Mac's own file in `collab/` rather than `board.json`, so a change made only to `board.json` can be lost. If another copy holds a newer stamp for the same field, that copy's value wins.
+
+The simpler alternative is to delete `collab/` and edit only `board.json`. A package with no `collab/` opens as exactly what `board.json` says, but that copy can no longer merge with copies edited elsewhere.
 
 ## Sharp edges
 

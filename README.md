@@ -59,7 +59,7 @@ Without `jsonschema` installed it still checks those, and every key the app cann
 - **Key order is deterministic.** The encoder writes pretty-printed with sorted keys, so every object is alphabetical and one field to a line. The same model produces the same bytes on any machine.
 - **Edits diff locally.** Nudging a sticky note is a two-line diff, the x and y of that item's `frame`. Depth is a fractional order key, so a reorder renumbers only the elements that actually moved.
 - **Defaults are omitted, so a reverted edit is byte-identical.** Cropping an image and then un-cropping it leaves the JSON exactly as if the crop had never happened.
-- **`board.json` is regenerated in full on every save.** Every save writes the whole file out of the model held in memory. Rewriting it by hand is legitimate, and the app reads what you wrote.
+- **`board.json` is regenerated in full on every save.** Every save writes the whole file out of the model held in memory. Rewriting it by hand is legitimate. For now, we recommend closing the board in the app first, and a package with a `collab/` folder needs the same change there too. See [Editing a saved board](file-format.md#editing-a-saved-board).
 
 ## Format version
 
