@@ -73,7 +73,7 @@ One consequence worth knowing before you write a tool: a key an older build does
 
 ## Feedback
 
-Issues and pull requests are welcome, especially "the spec says X but the app does Y". The app's source is closed. This repository is open, and the spec is written against the app's own model. Where the two disagree, the code is right and the spec is stale.
+Found a mistake, or something the app does differently from the spec? Let us know at [xulvalley.com/support](https://xulvalley.com/support/). Pull requests are welcome too. When the spec and the app disagree, the app is right and the spec needs fixing.
 
 ## License
 
